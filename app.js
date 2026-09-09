@@ -55,7 +55,8 @@ function seedDates() {
 function openDialog() { seedDates(); $('#formStatus').textContent = ''; $('#practiceDialog').showModal(); }
 function renderList() {
   const practices = readPractices();
-  $('#practiceCount').textContent = practices.length;
+  const practiceCount = $('#practiceCount');
+  if (practiceCount) practiceCount.textContent = practices.length;
   $('#listCount').textContent = practices.length;
   const list = $('#practiceList');
   list.innerHTML = !database ? '<p style="font-size:12px;color:#c84d30;padding:8px;line-height:1.6">공유 기능을 사용하려면 config.js에 Supabase 연결 정보를 설정해 주세요.</p>' : practices.length ? practices.map((p) => `
