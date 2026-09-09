@@ -44,3 +44,5 @@ $$;
 
 revoke all on function public.delete_practice(uuid, text) from public;
 grant execute on function public.delete_practice(uuid, text) to anon;
+
+notify pgrst, 'reload schema';
