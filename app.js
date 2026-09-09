@@ -145,13 +145,29 @@ async function createPractice(event) {
 function statusOf(practice) { const now = Date.now(), start = new Date(practice.startsAt), end = new Date(practice.endsAt); return now < start ? 'SCHEDULED' : now > end ? 'FINISHED' : 'IN PROGRESS'; }
 async function submissionsForPractice(practice) {
   const from = Math.floor(new Date(practice.startsAt).getTime() / 1000), to = Math.floor(new Date(practice.endsAt).getTime() / 1000);
-  const userChunks = []; for (let i = 0; i < practice.participants.length; i += 10) userChunks.push(practice.participants.slice(i, i + 10));
-  const problemChunks = []; for (let i = 0; i < practice.problems.length; i += 30) problemChunks.push(practice.problems.slice(i, i + 30));
-  const requests = userChunks.flatMap((users) => problemChunks.map(async (problems) => {
-    const url = `${API}/atcoder-api/v3/users_and_time?users=${encodeURIComponent(users.join(','))}&problems=${encodeURIComponent(problems.map((p) => p.id).join(','))}&from=${from}&to=${to}`;
-    return fetchJson(url);
-  }));
-  return (await Promise.all(requests)).flat();
+  const groups = new Map();
+  for (const user of practice.participants) {
+    for (const problem of practice.problems) {
+      const key = `${problem.contestId}\u0000${user}`;
+      if (!groups.has(key)) groups.set(key, { contest:problem.contestId, user, problemIds:new Set() });
+      groups.get(key).problemIds.add(problem.id);
+    }
+  }
+  const requests = [...groups.values()].map(({ contest, user, problemIds }) => async () => {
+    const url = `${API}/atcoder/submissions?contest=${encodeURIComponent(contest)}&user=${encodeURIComponent(user)}`;
+    const submissions = await fetchJson(url);
+    return submissions.filter((submission) => problemIds.has(submission.problem_id) && submission.epoch_second >= from && submission.epoch_second <= to);
+  });
+  const results = new Array(requests.length);
+  let next = 0;
+  async function worker() {
+    while (next < requests.length) {
+      const index = next++;
+      results[index] = await requests[index]();
+    }
+  }
+  await Promise.all(Array.from({ length:Math.min(3, requests.length) }, worker));
+  return results.flat();
 }
 function scoreRows(practice, submissions) {
   const start = new Date(practice.startsAt).getTime();
