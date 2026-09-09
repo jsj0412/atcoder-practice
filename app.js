@@ -76,7 +76,7 @@ function escapeHtml(s) { return s.replace(/[&<>'"]/g, (x) => ({ '&':'&amp;','<':
 
 async function fetchJson(url) {
   try {
-    const response = await fetch(url);
+    const response = await fetch(url, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
     if (!response.ok) throw new Error(`데이터 요청 실패 (${response.status})`);
     return response.json();
   } catch (error) {
@@ -157,7 +157,7 @@ function scoreRows(practice, submissions) {
   const start = new Date(practice.startsAt).getTime();
   return practice.participants.map((user) => {
     const cells = practice.problems.map((problem) => {
-      const attempts = submissions.filter((s) => s.user_id === user && s.problem_id === problem.id).sort((a,b) => a.epoch_second - b.epoch_second);
+      const attempts = submissions.filter((s) => String(s.user_id).toLowerCase() === user.toLowerCase() && s.problem_id === problem.id).sort((a,b) => a.epoch_second - b.epoch_second);
       const accepted = attempts.find((s) => s.result === 'AC');
       const wrongBefore = accepted ? attempts.filter((s) => s.epoch_second < accepted.epoch_second && s.result !== 'AC').length : 0;
       const minutes = accepted ? Math.max(0, Math.ceil((accepted.epoch_second * 1000 - start) / 60000)) : null;
@@ -185,6 +185,7 @@ async function showPractice(id, force = false) {
   $('#problemsStrip').innerHTML = practice.problems.map((p, i) => `<a class="problem-chip" style="--difficulty:${difficultyColor(p.difficulty)}" target="_blank" rel="noopener" href="https://atcoder.jp/contests/${encodeURIComponent(p.contestId)}/tasks/${encodeURIComponent(p.id)}"><strong>${String.fromCharCode(65 + i)} · ${escapeHtml(p.title)}</strong><span>${p.difficulty}</span></a>`).join('');
   $('#scoreHead').innerHTML = `<tr><th>#</th><th>참가자</th>${practice.problems.map((_,i) => `<th>${String.fromCharCode(65+i)}</th>`).join('')}<th>해결</th><th>페널티</th></tr>`;
   $('#scoreBody').innerHTML = `<tr><td colspan="${practice.problems.length + 5}" style="color:#64716d;padding:25px">제출 기록을 불러오는 중…</td></tr>`;
+  $('#syncInfo').textContent = '제출 기록 동기화 중…';
   $('#refreshButton').addEventListener('click', () => showPractice(id, true));
   $('#shareButton').addEventListener('click', async () => {
     try {
@@ -221,7 +222,11 @@ async function showPractice(id, force = false) {
   try {
     const rows = scoreRows(practice, await submissionsForPractice(practice));
     $('#scoreBody').innerHTML = rows.map((row, i) => `<tr><td class="rank">${i + 1}</td><td class="user">${escapeHtml(row.user)}</td>${row.cells.map(cellHtml).join('')}<td class="total">${row.solved}</td><td class="total">${row.penalty || '—'}</td></tr>`).join('');
-  } catch (error) { $('#scoreBody').innerHTML = `<tr><td colspan="${practice.problems.length + 5}" style="color:#c84d30;padding:25px">스코어보드를 불러오지 못했습니다: ${escapeHtml(error.message)}</td></tr>`; }
+    $('#syncInfo').textContent = `마지막 확인: ${new Intl.DateTimeFormat('ko-KR', { hour:'2-digit', minute:'2-digit', second:'2-digit' }).format(new Date())}`;
+  } catch (error) {
+    $('#scoreBody').innerHTML = `<tr><td colspan="${practice.problems.length + 5}" style="color:#c84d30;padding:25px">스코어보드를 불러오지 못했습니다: ${escapeHtml(error.message)}</td></tr>`;
+    $('#syncInfo').textContent = '동기화 실패';
+  }
   clearInterval(refreshTimer); refreshTimer = setInterval(() => showPractice(id), 60000);
 }
 
