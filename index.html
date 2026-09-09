@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AtCoder Practice</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="#">atcoder<span>practice</span></a>
+      <p>함께 푸는 가상 연습</p>
+      <button class="new-button" id="newPracticeButton">+ 새 연습</button>
+    </header>
+
+    <main class="shell">
+      <section class="hero">
+        <div>
+          <p class="eyebrow">VIRTUAL PRACTICE</p>
+          <h1>문제를 고르고,<br />같이 <em>풀어요.</em></h1>
+          <p class="hero-copy">AtCoder의 문제와 제출 기록으로 만드는 나만의 BOJ식 연습.</p>
+        </div>
+        <div class="hero-stat"><strong id="practiceCount">0</strong><span>저장된 연습</span></div>
+      </section>
+
+      <section class="workspace">
+        <aside class="practice-list-panel">
+          <div class="section-title"><h2>내 연습</h2><span id="listCount">0</span></div>
+          <div id="practiceList" class="practice-list"></div>
+          <button id="emptyCreateButton" class="outline-button">첫 연습 만들기</button>
+        </aside>
+
+        <section class="board-panel" id="boardPanel">
+          <div class="empty-board">
+            <div class="empty-icon">⌁</div>
+            <h2>연습을 선택하세요</h2>
+            <p>새 연습을 만들면 참가자의 풀이 현황을<br />실시간 스코어보드에서 확인할 수 있어요.</p>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <dialog id="practiceDialog">
+      <form id="practiceForm" method="dialog">
+        <div class="dialog-head">
+          <div><p class="eyebrow">NEW VIRTUAL PRACTICE</p><h2>새 연습 만들기</h2></div>
+          <button type="button" class="close-button" id="closeDialog" aria-label="닫기">×</button>
+        </div>
+        <div class="form-grid">
+          <label class="full">연습 이름
+            <input id="title" name="title" required maxlength="60" placeholder="예: 목요일 DP 연습" />
+          </label>
+          <label>시작 시간
+            <input id="startsAt" name="startsAt" required type="datetime-local" />
+          </label>
+          <label>종료 시간
+            <input id="endsAt" name="endsAt" required type="datetime-local" />
+          </label>
+          <label class="full">참가자 AtCoder ID <span class="hint">쉼표 또는 줄바꿈으로 구분</span>
+            <textarea id="participants" name="participants" required placeholder="tourist, chokudai&#10;my-atcoder-id"></textarea>
+          </label>
+          <label>최소 난이도
+            <span class="difficulty-input"><input id="minDifficulty" name="minDifficulty" type="number" min="0" value="400" step="100" required /><i id="minColor" aria-label="최소 난이도 색상"></i></span>
+          </label>
+          <label>최대 난이도
+            <span class="difficulty-input"><input id="maxDifficulty" name="maxDifficulty" type="number" min="0" value="1200" step="100" required /><i id="maxColor" aria-label="최대 난이도 색상"></i></span>
+          </label>
+          <label>문제 수
+            <input id="problemCount" name="problemCount" type="number" min="1" max="20" value="5" required />
+          </label>
+          <fieldset>
+            <legend>문제 배치</legend>
+            <label class="radio"><input type="radio" name="ordering" value="random" checked /> 무작위</label>
+            <label class="radio"><input type="radio" name="ordering" value="difficulty" /> 난이도 순 정렬</label>
+          </fieldset>
+        </div>
+        <div class="difficulty-legend" aria-label="AtCoder 난이도 색상 범례">
+          <span><i class="gray"></i>0–399</span><span><i class="brown"></i>400–799</span><span><i class="green"></i>800–1199</span><span><i class="cyan"></i>1200–1599</span><span><i class="blue"></i>1600–1999</span><span><i class="yellow"></i>2000–2399</span><span><i class="orange"></i>2400–2799</span><span><i class="red"></i>2800+</span>
+        </div>
+        <p class="notice">참가자 중 한 명이라도 과거에 제출한 문제는 자동으로 제외합니다.</p>
+        <div id="formStatus" class="form-status" aria-live="polite"></div>
+        <div class="dialog-actions">
+          <button type="button" class="cancel-button" id="cancelDialog">취소</button>
+          <button type="submit" class="create-button">연습 생성</button>
+        </div>
+      </form>
+    </dialog>
+
+    <template id="boardTemplate">
+      <div class="board-head">
+        <div><p class="eyebrow" id="practiceStatus"></p><h2 id="boardTitle"></h2><p class="board-meta" id="boardMeta"></p></div>
+        <div class="board-actions"><button class="refresh-button" id="shareButton">↗ 공유 링크</button><button class="refresh-button" id="refreshButton">↻ 점수 갱신</button></div>
+      </div>
+      <div class="problems-strip" id="problemsStrip"></div>
+      <div class="table-wrap">
+        <table class="scoreboard">
+          <thead id="scoreHead"></thead>
+          <tbody id="scoreBody"></tbody>
+        </table>
+      </div>
+      <p class="board-foot">페널티 = AC까지 경과 분 + AC 전 오답 수 × 20분 · 스코어보드는 60초마다 자동 갱신됩니다.</p>
+    </template>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="./config.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>
