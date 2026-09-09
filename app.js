@@ -3,6 +3,7 @@ const API = '/api';
 const RESOURCES = `${API}/resources`;
 const STORAGE_KEY = 'atcoder-practice-v1';
 const ACTIVE_PRACTICE_KEY = 'atcoder-practice-active-id';
+const DELETE_TOKENS_KEY = 'atcoder-practice-delete-tokens-v1';
 const supabaseConfig = window.ATCODER_PRACTICE_SUPABASE;
 const database = window.supabase && supabaseConfig?.url && supabaseConfig?.publishableKey
   ? window.supabase.createClient(supabaseConfig.url, supabaseConfig.publishableKey)
@@ -16,6 +17,12 @@ const localInputDate = (date) => new Date(date.getTime() - date.getTimezoneOffse
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const readPractices = () => JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
 const savePractices = (items) => localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+const readDeleteTokens = () => JSON.parse(localStorage.getItem(DELETE_TOKENS_KEY) || '{}');
+const saveDeleteTokens = (tokens) => localStorage.setItem(DELETE_TOKENS_KEY, JSON.stringify(tokens));
+async function hashToken(token) {
+  const bytes = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token)));
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
 function practiceToRow(practice) {
   return { id:practice.id, title:practice.title, starts_at:practice.startsAt, ends_at:practice.endsAt, participants:practice.participants, min_difficulty:practice.minDifficulty, max_difficulty:practice.maxDifficulty, ordering:practice.ordering, problems:practice.problems };
 }
@@ -125,8 +132,10 @@ async function createPractice(event) {
     if (ordering === 'difficulty') selected.sort((a, b) => a.difficulty - b.difficulty || a.id.localeCompare(b.id));
     const practice = { id:crypto.randomUUID(), title:$('#title').value.trim(), startsAt:startsAt.toISOString(), endsAt:endsAt.toISOString(), participants, minDifficulty, maxDifficulty, ordering, problems:selected, createdAt:new Date().toISOString() };
     status.textContent = '공유 연습을 저장하는 중…';
-    const { error } = await database.from('practices').insert(practiceToRow(practice));
+    const deletionToken = crypto.randomUUID();
+    const { error } = await database.from('practices').insert({ ...practiceToRow(practice), delete_token_hash: await hashToken(deletionToken) });
     if (error) throw new Error(`공유 연습 저장 실패: ${error.message}`);
+    saveDeleteTokens({ ...readDeleteTokens(), [practice.id]: deletionToken });
     savePractices([practice, ...readPractices().filter((item) => item.id !== practice.id)]); activePracticeId = practice.id;
     $('#practiceDialog').close(); renderList(); showPractice(practice.id);
   } catch (error) { status.textContent = error.message || '연습 생성 중 오류가 발생했습니다.'; status.classList.add('error'); }
@@ -184,6 +193,31 @@ async function showPractice(id, force = false) {
       setTimeout(() => { const button = $('#shareButton'); if (button) button.textContent = '↗ 공유 링크'; }, 1500);
     } catch { window.prompt('이 링크를 복사해 공유하세요.', window.location.href); }
   });
+  const deletionToken = readDeleteTokens()[id];
+  if (deletionToken) {
+    const deleteButton = $('#deleteButton');
+    deleteButton.hidden = false;
+    deleteButton.addEventListener('click', async () => {
+      if (!window.confirm(`'${practice.title}' 연습을 삭제할까요? 이 작업은 되돌릴 수 없습니다.`)) return;
+      deleteButton.disabled = true;
+      deleteButton.textContent = '삭제 중…';
+      const { data, error } = await database.rpc('delete_practice', { target_id:id, deletion_token:deletionToken });
+      if (error || !data) {
+        deleteButton.disabled = false;
+        deleteButton.textContent = '연습 삭제';
+        window.alert(error?.message || '삭제 권한이 없거나 이미 삭제된 연습입니다.');
+        return;
+      }
+      const tokens = readDeleteTokens();
+      delete tokens[id];
+      saveDeleteTokens(tokens);
+      savePractices(readPractices().filter((item) => item.id !== id));
+      clearInterval(refreshTimer);
+      const url = new URL(window.location.href);
+      url.searchParams.delete('practice');
+      window.location.replace(url);
+    });
+  }
   try {
     const rows = scoreRows(practice, await submissionsForPractice(practice));
     $('#scoreBody').innerHTML = rows.map((row, i) => `<tr><td class="rank">${i + 1}</td><td class="user">${escapeHtml(row.user)}</td>${row.cells.map(cellHtml).join('')}<td class="total">${row.solved}</td><td class="total">${row.penalty || '—'}</td></tr>`).join('');

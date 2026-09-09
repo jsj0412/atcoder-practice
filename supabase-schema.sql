@@ -11,6 +11,7 @@ create table if not exists public.practices (
   max_difficulty integer not null check (max_difficulty >= min_difficulty),
   ordering text not null check (ordering in ('random', 'difficulty')),
   problems jsonb not null,
+  delete_token_hash text not null,
   created_at timestamptz not null default now()
 );
 
@@ -23,3 +24,23 @@ on public.practices for select to anon using (true);
 
 create policy "Anyone can create a practice"
 on public.practices for insert to anon with check (true);
+
+-- 삭제 토큰을 아는 생성자만 삭제할 수 있습니다.
+create extension if not exists pgcrypto with schema extensions;
+
+create or replace function public.delete_practice(target_id uuid, deletion_token text)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, extensions
+as $$
+begin
+  delete from public.practices
+  where id = target_id
+    and delete_token_hash = encode(digest(deletion_token, 'sha256'), 'hex');
+  return found;
+end;
+$$;
+
+revoke all on function public.delete_practice(uuid, text) from public;
+grant execute on function public.delete_practice(uuid, text) to anon;

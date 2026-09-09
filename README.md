@@ -11,6 +11,8 @@ AtCoder Problems의 공개 데이터로 가상 연습을 생성하고 BOJ 형식
 
 연습 설정과 선정 문제는 Supabase에 저장됩니다. 연습 화면의 **공유 링크** 버튼으로 복사한 URL을 열면, 다른 브라우저에서도 같은 연습과 스코어보드를 볼 수 있습니다.
 
+기존에 SQL을 실행한 프로젝트에 삭제 기능을 적용하려면 [supabase-migration-delete.sql](./supabase-migration-delete.sql)도 SQL Editor에서 한 번 실행하세요. 생성자 브라우저에서만 **연습 삭제** 버튼이 보입니다.
+
 ## 실행
 
 `start.bat`을 더블 클릭한 뒤 브라우저로 `http://localhost:4173`을 여세요. 실행 창은 닫지 마세요.
